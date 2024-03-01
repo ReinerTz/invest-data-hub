@@ -33,9 +33,9 @@ export class StocksService {
         const quote = parseNumberFromString($(tds[1]).text());
         const pl = parseNumberFromString($(tds[2]).text());
         const pvp = parseNumberFromString($(tds[3]).text());
-        const psr = parseNumberFromString($(tds[4]).text());
+        const psr = parseNumberFromString($(tds[4]).text()); // aqui tá errado
         const dividendYield = parseNumberFromString($(tds[5]).text());
-        const priceToAsset = parseNumberFromString($(tds[6]).text());
+        const priceToAsset = parseNumberFromString($(tds[6]).text()); // errado
         const priceToWorkingCapital = parseNumberFromString($(tds[7]).text());
         const priceToEbit = parseNumberFromString($(tds[8]).text());
         const priceToCurrentAsset = parseNumberFromString($(tds[9]).text());
