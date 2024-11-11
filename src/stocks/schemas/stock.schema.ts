@@ -3,10 +3,13 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import { PREFIX } from '../../utils/prefix.constants';
 
-export type StockDocument = Stock & Document;
+type StockDocument = Stock & Document;
 
 @Schema({ timestamps: true })
 export class Stock {
+  @Prop({ required: false })
+  id: string;
+
   @Prop({ required: true })
   ticker: string;
 
@@ -71,7 +74,7 @@ export class Stock {
   growthRateFiveYears: number;
 }
 
-export const StockSchema = SchemaFactory.createForClass(Stock);
+const StockSchema = SchemaFactory.createForClass(Stock);
 
 StockSchema.pre<Stock & Document>('save', function (next) {
   if (this.isNew) {
@@ -79,3 +82,5 @@ StockSchema.pre<Stock & Document>('save', function (next) {
   }
   next();
 });
+
+export { StockSchema, StockDocument };

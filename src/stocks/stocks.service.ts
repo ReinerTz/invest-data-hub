@@ -1,23 +1,39 @@
-// src/data-extraction/data-extraction.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import * as cheerio from 'cheerio';
 import { Model } from 'mongoose';
 import { Stock, StockDocument } from '../stocks/schemas/stock.schema';
 import { parseNumberFromString } from 'src/utils/number';
-import { Cron } from '@nestjs/schedule';
+import { isToday } from 'date-fns';
+import { UpdateControl } from './schemas/update-control.schema';
 
 @Injectable()
 export class StocksService {
   constructor(
     @InjectModel(Stock.name) private stockModel: Model<StockDocument>,
+    @InjectModel(UpdateControl.name)
+    private updateControlModel: Model<UpdateControl>,
   ) {}
 
-  @Cron('0 0 * * *') // Executa todos os dias à meia-noite
-  // @Cron('39 18 * * *') // Executa todos os dias à meia-noite
-  private async handleCronCreateStocks(): Promise<void> {
+  private async updateLastUpdateDate(): Promise<void> {
+    const updateControl = await this.updateControlModel.findOne();
+    if (updateControl) {
+      updateControl.lastUpdate = new Date();
+      await updateControl.save();
+    } else {
+      await this.updateControlModel.create({ lastUpdate: new Date() });
+    }
+  }
+
+  private async shouldUpdate(): Promise<boolean> {
+    const updateControl = await this.updateControlModel.findOne();
+    return !updateControl || !isToday(updateControl.lastUpdate);
+  }
+
+  async update(): Promise<void> {
     const url = 'https://fundamentus.com.br/resultado.php';
     await this.createStocks(url);
+    await this.updateLastUpdateDate();
   }
 
   private async createStocks(url: string): Promise<void> {
@@ -26,16 +42,15 @@ export class StocksService {
       const body = await response.text();
       const $ = cheerio.load(body);
 
-      // Exemplo de extração de dados (ajuste conforme necessário)
       $('table tbody tr').each(async (index, element) => {
         const tds = $(element).find('td');
         const ticker = $(tds[0]).text().trim();
         const quote = parseNumberFromString($(tds[1]).text());
         const pl = parseNumberFromString($(tds[2]).text());
         const pvp = parseNumberFromString($(tds[3]).text());
-        const psr = parseNumberFromString($(tds[4]).text()); // aqui tá errado
+        const psr = parseNumberFromString($(tds[4]).text());
         const dividendYield = parseNumberFromString($(tds[5]).text());
-        const priceToAsset = parseNumberFromString($(tds[6]).text()); // errado
+        const priceToAsset = parseNumberFromString($(tds[6]).text());
         const priceToWorkingCapital = parseNumberFromString($(tds[7]).text());
         const priceToEbit = parseNumberFromString($(tds[8]).text());
         const priceToCurrentAsset = parseNumberFromString($(tds[9]).text());
@@ -82,20 +97,17 @@ export class StocksService {
   }
 
   async findLatestForEachTicker(): Promise<StockDocument[]> {
+    if (await this.shouldUpdate()) {
+      console.log('Updating stocks...');
+      await this.update();
+      console.log('Stocks are up to date');
+    }
+
     return this.stockModel
       .aggregate([
-        {
-          $sort: { createdAt: -1 },
-        },
-        {
-          $group: {
-            _id: '$ticker',
-            doc: { $first: '$$ROOT' },
-          },
-        },
-        {
-          $replaceRoot: { newRoot: '$doc' },
-        },
+        { $sort: { createdAt: -1 } },
+        { $group: { _id: '$ticker', doc: { $first: '$$ROOT' } } },
+        { $replaceRoot: { newRoot: '$doc' } },
       ])
       .exec();
   }
