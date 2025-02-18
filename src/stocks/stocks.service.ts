@@ -97,7 +97,7 @@ export class StocksService {
         savePromises.push(stock.save());
       });
 
-      await Promise.all(savePromises); // Aguarda todas as operações de salvamento
+      await Promise.all(savePromises); // Aguarda todas as operações de salvamento.
       console.log('Todos os registros foram salvos.');
     } catch (error) {
       console.error('Erro ao extrair dados:', error);
