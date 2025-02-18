@@ -27,7 +27,9 @@ export class StocksService {
 
   private async shouldUpdate(): Promise<boolean> {
     const updateControl = await this.updateControlModel.findOne();
-    return !updateControl || !isToday(updateControl.lastUpdate);
+    const shouldUpdate = !updateControl || !isToday(updateControl.lastUpdate);
+    console.log(`Should update? ${shouldUpdate}`);
+    return shouldUpdate;
   }
 
   async update(): Promise<void> {
@@ -42,7 +44,9 @@ export class StocksService {
       const body = await response.text();
       const $ = cheerio.load(body);
 
-      $('table tbody tr').each(async (index, element) => {
+      const savePromises = [];
+
+      $('table tbody tr').each((index, element) => {
         const tds = $(element).find('td');
         const ticker = $(tds[0]).text().trim();
         const quote = parseNumberFromString($(tds[1]).text());
@@ -89,15 +93,21 @@ export class StocksService {
           debtToEquity,
           growthRateFiveYears,
         });
-        await stock.save();
+
+        savePromises.push(stock.save());
       });
+
+      await Promise.all(savePromises); // Aguarda todas as operações de salvamento
+      console.log('Todos os registros foram salvos.');
     } catch (error) {
       console.error('Erro ao extrair dados:', error);
     }
   }
 
   async findLatestForEachTicker(): Promise<StockDocument[]> {
-    if (await this.shouldUpdate()) {
+    const shouldUpdate = await this.shouldUpdate();
+
+    if (shouldUpdate) {
       console.log('Updating stocks...');
       await this.update();
       console.log('Stocks are up to date');
